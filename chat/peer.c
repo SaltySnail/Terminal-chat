@@ -10,6 +10,7 @@
 #include <fcntl.h>
 #include <pthread.h>
 #include <netdb.h>
+#include <stdbool.h>
 #include "message.h"
 
 int sock;
@@ -19,6 +20,7 @@ struct sockaddr_in peer_list[100];
 unsigned int room_num = 0;
 int peer_num = 0;
 char my_name[40];
+bool welcome = 0;
 
 pthread_mutex_t stdout_lock;
 pthread_mutex_t peer_list_lock;
@@ -36,7 +38,6 @@ void request_available_rooms();
 void get_room_info();
 
 void receive_packet();
-//void name_reply(packet *pkt);
 void create_room_reply(packet *pkt);
 void join_room_reply(packet *pkt);
 void leave_room_reply(packet *pkt);
@@ -100,6 +101,7 @@ void * read_input(void *ptr) {
 	char line[1000];
 	char *p;
 	while (1) {
+
 		// read input
 		memset(line, 0, sizeof(line));
 		p = fgets(line, sizeof(line), stdin);
@@ -187,6 +189,15 @@ void receive_packet() {
 				break;
 			case 'j':
 				join_room_reply(&pkt);
+				if (welcome) {
+					char message[70] = "";
+					char welcome_msg[30] = " has joined the chat.";
+					strcat(message, my_name);
+					strcat(message, welcome_msg);
+					printf("Sending the following message:\n %s\n", message);
+					send_message(message);
+					welcome = 0;
+				}
 				break;
 			case 'l':
 				leave_room_reply(&pkt);
@@ -200,9 +211,6 @@ void receive_packet() {
 			case 'm':
 				receive_message(&sender_addr, &pkt);
 				break;
-			/*case 'n':
-				name_reply(&pkt);
-				break;*/
 			case 'p':
 				reply_to_ping(&sender_addr);
 				break;
@@ -228,7 +236,7 @@ void name_request(char *name) {
 	pkt.header.error = '\0';
 	//pkt.header.room = room_num;
 	pkt.header.payload_length = strlen(name) + 1;
-	memcpy(pkt.header.name, name, sizeof(char[40]));
+	memcpy(pkt.header.name, name, sizeof(pkt.header.name));
 
 	int status = sendto(sock, &pkt, sizeof(pkt.header), 0, (struct sockaddr *)&tracker_addr, sizeof(struct sockaddr_in));
 	if (status == -1) {
@@ -258,6 +266,7 @@ void join_room_request(int new_room_num) {
 	packet pkt;
 	pkt.header.type = 'j';
 	pkt.header.error = '\0';
+	memcpy(pkt.header.name, my_name, sizeof(my_name));
 	pkt.header.room = new_room_num;
 	pkt.header.payload_length = 0;
 
@@ -419,6 +428,7 @@ void join_room_reply(packet *pkt) {
 		memcpy(peer_list, pkt->payload, peer_num * sizeof(struct sockaddr_in));
 		pthread_mutex_lock(&stdout_lock);
 		printf("%s %d\n", "you have joined chatroom", room_num);
+		welcome = 1;
 		pthread_mutex_unlock(&stdout_lock);
 	}
 	pthread_mutex_unlock(&peer_list_lock);
@@ -460,7 +470,7 @@ void user_connection_updates(packet *pkt) {
 	}
 	else {
 		pthread_mutex_lock(&stdout_lock);
-		printf("%s\n", "room update recieved.");
+		printf("Room was updated\n");
 		pthread_mutex_unlock(&stdout_lock);
 		peer_num = new_peer_num;
 		memcpy(peer_list, pkt->payload, peer_num * sizeof(struct sockaddr_in));

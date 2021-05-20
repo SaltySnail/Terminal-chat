@@ -43,7 +43,7 @@ void send_pings();
 void delete_dead_peers();
 void peer_name(unsigned int ip, short port, char *name);
 void peer_create_room(unsigned int ip, short port);
-void peer_join(unsigned int ip, short port, unsigned int room);
+void peer_join(unsigned int ip, short port, unsigned int room, char *name);
 void peer_leave(unsigned int ip, short port);
 void room_list(unsigned int ip, short port);
 void peer_list(unsigned int join_ip, short join_port, unsigned int room);
@@ -118,7 +118,7 @@ int main(int argc, char **argv){
           peer_create_room(ip, port);
           break;
         case 'j':
-          peer_join(ip, port, recv_pkt.header.room);
+          peer_join(ip, port, recv_pkt.header.room, recv_pkt.header.name);
           break;
         case 'l':
           peer_leave(ip, port);
@@ -216,8 +216,17 @@ void peer_name (unsigned int ip, short port, char *name) {
   if(s!=NULL){
     pthread_mutex_lock(&peers_lock);
     memcpy(s->name, name, sizeof(s->name));
+    printf("%s is a new name\n", s->name);
     pthread_mutex_unlock(&peers_lock);
-  }else{
+  }
+    HASH_FIND_STR(peers, ip_port, s);
+  if(s!=NULL){
+    pthread_mutex_lock(&peers_lock);
+    memcpy(s->name, name, sizeof(s->name));
+    printf("%s is a new name\n", s->name);
+    pthread_mutex_unlock(&peers_lock);
+  }  
+    else{
     pthread_mutex_lock(&stdout_lock);
     fprintf(stderr, "%s\n", "peer not found for ping response");
     pthread_mutex_unlock(&stdout_lock);
@@ -327,7 +336,7 @@ void peer_create_room(unsigned int ip, short port){
   }
 }
 
-void peer_join(unsigned int ip, short port, unsigned int room){
+void peer_join(unsigned int ip, short port, unsigned int room, char *name){
   struct peer *s;
   int r=0;
   int room_exists = 0;
@@ -341,6 +350,7 @@ void peer_join(unsigned int ip, short port, unsigned int room){
         send_error(ip, port, 'j', 'f');
         return;
       }
+      memcpy(s->name, name, sizeof(s->name));
       room_exists = 1;
     }
   }
@@ -358,6 +368,7 @@ void peer_join(unsigned int ip, short port, unsigned int room){
   char* ip_and_port_format = (char *)"%d:%d";
   sprintf(new_peer->ip_and_port, ip_and_port_format, ip, port);
   new_peer->room = room;
+  memcpy(new_peer->name, name, sizeof(new_peer->name));
   new_peer->alive = 1;
   
 
@@ -535,6 +546,7 @@ void peer_list(unsigned int join_ip, short join_port, unsigned int room){
   packet update_pkt;
   update_pkt.header.type = 'u';
   update_pkt.header.error = '\0';
+  //memcpy(update_pkt.header.name, s->name, sizeof(update_pkt.header.name));
   update_pkt.header.payload_length = num_in_room * sizeof(struct sockaddr_in);
   memcpy(update_pkt.payload, list, num_in_room * sizeof(struct sockaddr_in));
   for(s=peers; s != NULL; s=(peer *)s->hh.next){
