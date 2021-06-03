@@ -121,47 +121,49 @@ void * read_input(void *ptr) {
 
 		// parse input
 		if (line[0] != '-') {
-			pthread_mutex_lock(&stdout_lock);
+			/*pthread_mutex_lock(&stdout_lock);
 			fprintf(stderr, "%s\n", "error - input format is not correct.");
 			pthread_mutex_unlock(&stdout_lock);
-			continue;
-		}
-		int new_room_num;
-		switch (line[1]) {
-			case 'c': 
-				create_room_request();
-				break;
-			case 'j':
-				new_room_num = atoi(line + 3);
-				if (new_room_num < 0) {
+			continue;*/
+			send_message(line);
+		} else {
+			int new_room_num;
+			switch (line[1]) {
+				case 'c': 
+					create_room_request();
+					break;
+				case 'j':
+					new_room_num = atoi(line + 3);
+					if (new_room_num < 0) {
+						pthread_mutex_lock(&stdout_lock);
+						fprintf(stderr, "%s\n", "error - room number invalid.");
+						pthread_mutex_unlock(&stdout_lock);
+					}
+					else {
+						join_room_request(new_room_num);
+					}
+					break;
+				case 'l':
+					leave_room_request();
+					break;
+				/*case 'm':
+					send_message(line + 3);
+					break;*/
+				case 'n':
+					name_request(line + 3);
+					break;
+				case 'r':
+					request_available_rooms();
+					break;
+				case 'i':
+					get_room_info();
+					break;
+				default:
 					pthread_mutex_lock(&stdout_lock);
-					fprintf(stderr, "%s\n", "error - room number invalid.");
+					fprintf(stderr, "%s\n", "error - request type unknown.");
 					pthread_mutex_unlock(&stdout_lock);
-				}
-				else {
-					join_room_request(new_room_num);
-				}
-				break;
-			case 'l':
-				leave_room_request();
-				break;
-			case 'm':
-				send_message(line + 3);
-				break;
-			case 'n':
-				name_request(line + 3);
-				break;
-			case 'r':
-				request_available_rooms();
-				break;
-			case 'i':
-				get_room_info();
-				break;
-			default:
-				pthread_mutex_lock(&stdout_lock);
-				fprintf(stderr, "%s\n", "error - request type unknown.");
-				pthread_mutex_unlock(&stdout_lock);
-				break;
+					break;
+			}
 		}
 	}
   return NULL;
